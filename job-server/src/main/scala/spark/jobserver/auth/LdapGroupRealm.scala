@@ -79,6 +79,7 @@ class LdapGroupRealm extends JndiLdapRealm {
   }
 
   def setUserGroupAttribute(aUserGroupAttribute : String) {
+    logger.debug("Setting user group attribute to {}", aUserGroupAttribute)
     userGroupAttribute = aUserGroupAttribute
   }
 
@@ -104,7 +105,7 @@ class LdapGroupRealm extends JndiLdapRealm {
       groupSearchAtts, searchCtls).asScala
 
     groupAnswer.map { sr2 =>
-      logger.debug("Checking members of group [%s]", sr2.getName())
+      logger.debug("Checking members of group {}", sr2.getName())
       sr2.getName() -> getMembers(sr2)
     }.toMap
   }
@@ -113,8 +114,19 @@ class LdapGroupRealm extends JndiLdapRealm {
     val attrs: Attributes = sr.getAttributes()
 
     if (attrs != null) {
-      LdapUtils.getAllAttributeValues(attrs.get(userGroupAttribute)).asScala.toSet
+      val att = attrs.get(userGroupAttribute)
+      if (att != null) {
+        logger.debug("attributes ignore case: {}", attrs.isCaseIgnored())
+        val members = LdapUtils.getAllAttributeValues(att).asScala.toSet
+        logger.debug("... {} member values found", members.size)
+
+        members
+      } else  {
+        logger.debug("... attribute {} not found in attributes", userGroupAttribute)
+        Set()
+      }
     } else {
+      logger.debug("... no attributes found")
       Set()
     }
   }
@@ -129,6 +141,7 @@ class LdapGroupRealm extends JndiLdapRealm {
 
     answer.map { userSearchResult =>
       val fullGroupMemberName = "%s,%s" format (userSearchResult.getName(), searchBase)
+      logger.debug("checking for group member name: {}", fullGroupMemberName)
       members.filter(entry => {
         entry._2.contains(fullGroupMemberName)
       }).map(e => e._1)
